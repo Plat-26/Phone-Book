@@ -6,6 +6,10 @@ Searching functionality includes:
 
 -Linear Search
 
--Binary Search
+-Bubble Sort and Jump Search
+
+-Quick Sort and Binary Search
+
+-Instant Search
 
 -Search Time Difference
