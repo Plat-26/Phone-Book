@@ -3,6 +3,7 @@ package phonebook;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Scanner;
 
 public class Main {
@@ -19,22 +20,36 @@ class SearchEngine {
 
     BinarySearch binary = new BinarySearch();
 
+    InstantSearch instant = new InstantSearch();
 
-    void searchMenu(ArrayList<String> dir, ArrayList<String> findDir ) {
+
+    void searchMenu(ArrayList<String> dir, ArrayList<String> findDir, HashMap<String, Long> phoneDir) {
         System.out.println("Start searching (linear search)...");
         long linearTime = linear.linearSearch(dir, findDir);
         System.out.print("Time taken: " + convertTime(linearTime) + "\n");
-        System.out.println("\n");
+        System.out.println();
+
         jump.jumpSearch(dir, findDir, linearTime);
+        System.out.println();
 
         System.out.println("Start searching (quick sort + binary search)...");
         binary.binarySearch(dir, findDir);
+        System.out.println();
+
+        System.out.println("Start searching (hash table)...");
+        long tableCreationTime = instant.createTable(phoneDir);
+        long instantSearchingTime = instant.instantSearch(findDir);
+        System.out.println("Time taken: " + convertTime(tableCreationTime + instantSearchingTime));
+        System.out.println("Creating time: " + convertTime(tableCreationTime));
+        System.out.println("Searching time: " + convertTime(instantSearchingTime));
+
     }
 
     void importDirectories() {
         File dirFile = new File("C:\\Users\\abosede\\Downloads\\directory.txt");
         File findFile = new File("C:\\Users\\abosede\\Downloads\\find.txt");
 
+        HashMap<String, Long> phoneDirectory = new HashMap<>();
         ArrayList<String> directory = new ArrayList<>();
         ArrayList<String> findDir = new ArrayList<>();
 
@@ -43,6 +58,8 @@ class SearchEngine {
                 String s = scanDir.nextLine();
                 String[] arry = s.split(" ");
                 directory.add(arry[1]);
+                long number = Long.parseLong(arry[0]);
+                phoneDirectory.put(arry[1], number);
             }
         } catch (FileNotFoundException e) {
             System.out.println(e.getMessage());
@@ -58,8 +75,7 @@ class SearchEngine {
             System.out.println(e.getMessage());
         }
 
-        this.searchMenu(directory, findDir);
-
+        this.searchMenu(directory, findDir, phoneDirectory);
     }
 
     String convertTime(long time) {
@@ -89,7 +105,7 @@ class LinearSearch {
         }
 
 
-        System.out.print("Found " + found + " / " + numberOfEntries + " entries ");
+        System.out.print("Found " + found + "/" + numberOfEntries + " entries ");
 
         return  System.currentTimeMillis() - startTime;
     }
@@ -99,6 +115,7 @@ class JumpSearch {
 
     long jumpSearch(ArrayList<String> dir, ArrayList<String> findDir) {
         long searchStart = System.currentTimeMillis();
+        int totalEntries = 0;
         int found = 0;
 
         int jumpLength = (int) Math.sqrt(dir.size());
@@ -107,13 +124,15 @@ class JumpSearch {
 
 
         for (String name : findDir) {
-            while (currentBlk < dir.size()) {
+            totalEntries++;
 
-                currentBlk = Math.min(currentBlk + jumpLength, dir.size());
+            while (currentBlk < dir.size() - 1) {
 
-                if (dir.get(currentBlk).charAt(0) >= name.charAt(0)) {//find possible block
+                currentBlk = Math.min(currentBlk + jumpLength, dir.size() - 1);
 
-                    for (int i = currentBlk; i > previousBlk; i--) {//do a backward search
+                if (dir.get(currentBlk).compareTo(name) >= 0) {//find possible block
+
+                    for (int i = currentBlk; i > previousBlk; i--) {  //do a backward search
                         if (dir.get(i).equals(name)) {
                             found++;
                             break;
@@ -126,7 +145,7 @@ class JumpSearch {
 
         }
 
-        System.out.print("Found " + found + "/ 500 entries.");
+        System.out.print("Found " + found + "/" +totalEntries + " entries.");
         return System.currentTimeMillis() - searchStart;
 
     }
@@ -136,7 +155,7 @@ class JumpSearch {
         System.out.println("Start searching (bubble sort + jump search)...");
         long sortTime = this.bubbleSort(dir, linearTime);
 
-        if (sortTime > 10 * linearTime) { 
+        if (sortTime > 10 * linearTime) {
             LinearSearch linear = new LinearSearch();
             long t = linear.linearSearch(dir, findDir);
             long totalTime = t + sortTime;
@@ -155,16 +174,15 @@ class JumpSearch {
     }
 
     long bubbleSort(ArrayList<String> dir, long linearTime) { //sort directory with bubble sort
-        String[] arry = dir.toArray(new String[0]);
         long sortStart = System.currentTimeMillis();
 
-        for (int i = 0; i < arry.length - 1; i++) {
-            for(int j = 0; j < arry.length - 1 - i; j++) {
+        for (int i = 0; i < dir.size() - 1; i++) {
+            for(int j = 0; j < dir.size() - i - 1; j++) {
 
-                if (arry[j].charAt(0) > arry[j + 1].charAt(0)) {
-                    String temp = arry[j + 1];
-                    arry[j + 1] = arry[j];
-                    arry[j] = temp;
+                if (dir.get(j).compareTo(dir.get(j + 1)) > 0) {
+                    String temp = dir.get(j + 1);
+                    dir.set(j + 1,  dir.get(j));
+                    dir.set(j, temp);
                 }
             }
 
@@ -203,7 +221,7 @@ class BinarySearch {
         }
         long binarySearchTime = System.currentTimeMillis() - binarySearchStart;
 
-        System.out.print("Found " + found + " / " + findDir.size() + "entries.");
+        System.out.print("Found " + found + "/" + findDir.size() + " entries.");
         System.out.println("Time taken: " + convertTime(binarySearchTime + quickSortTime));
         System.out.println("Sorting time: " + convertTime(quickSortTime));
         System.out.println("Searching time: " + convertTime(binarySearchTime));
@@ -279,3 +297,122 @@ class BinarySearch {
     }
 }
 
+
+
+class InstantSearch {
+
+    HashTable<Long> contacts = new HashTable<>(100);
+
+    long createTable(HashMap<String, Long> dir) {
+
+        long createStart = System.currentTimeMillis();
+
+        for(HashMap.Entry<String, Long> entry : dir.entrySet()) {
+            int key = Math.abs(entry.getKey().hashCode());
+            contacts.put(key, entry.getValue());
+        }
+        return System.currentTimeMillis() - createStart;
+    }
+
+    long instantSearch(ArrayList<String> findDir) {
+        int found = 0;
+        int totalEntries = 0;
+        long searchStart = System.currentTimeMillis();
+
+        for (String name : findDir) {
+            totalEntries++;
+            int key = Math.abs(name.hashCode());
+            if (contacts.get(key) != null) {
+
+                found++;
+            }
+        }
+
+        System.out.print("Found " + found + "/" + totalEntries + " entries.");
+
+        return System.currentTimeMillis() - searchStart;
+    }
+
+}
+
+class HashTable<T> {
+    private int size;
+    private TableEntry[] table;
+
+    public HashTable(int size) {
+        this.size = size;
+        table = new TableEntry[size];
+    }
+
+    private int findEntryIndex(int key) {
+        int hash = key % size;
+        while(!(table[hash] == null || table[hash].getKey() == key)) {
+
+            hash = (hash + 1) % size;
+
+            if (hash == key % size) {
+                return  -1;
+            }
+        }
+
+        return hash;
+    }
+
+    public boolean put(int key, T value) {
+
+        int idx = findEntryIndex(key);
+
+        if (idx == -1) {
+            rehash();
+            idx = findEntryIndex(key);
+        }
+
+        table[idx] = new TableEntry(key, value);
+        return true;
+    }
+
+    public T get(int key) {
+
+        int idx = findEntryIndex(key);
+
+        if (idx == -1 || table[idx] == null) {
+            return null;
+        }
+
+        return (T) table[idx].getValue();
+    }
+
+    private void rehash() {
+        size = size * 2;
+        TableEntry[] oldTable = table;
+        table = new TableEntry[size];
+
+        for (TableEntry t : oldTable) {
+            int idx = findEntryIndex(t.getKey());
+
+            table[idx] = t;
+        }
+
+    }
+
+}
+
+class TableEntry<T> {
+
+    private final int key;
+    private final T value;
+
+    public TableEntry(int key, T value) {
+
+        this.key = key;
+        this.value = value;
+    }
+
+    public int getKey() {
+        return key;
+    }
+
+    public T getValue() {
+        return value;
+    }
+}
